@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import List
 
@@ -31,9 +32,10 @@ class RequestBody(BaseModel):
 @app.post("/analytics")
 def analytics(body: RequestBody, x_api_key: str = Header(None)):
     if x_api_key != API_KEY:
-        raise HTTPException(status_code=401)
+        if x_api_key != API_KEY:
+            return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
-    revenue = 0
+    revenue = 0.0
     totals = {}
 
     for e in body.events:

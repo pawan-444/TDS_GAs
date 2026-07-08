@@ -1,0 +1,2 @@
+workers: 11
+log_level: warning

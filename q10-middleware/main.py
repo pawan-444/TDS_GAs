@@ -32,40 +32,36 @@ clients = {}
 
 
 @app.middleware("http")
-async def middleware(request: Request, call_next):
-
+async def request_context_and_rate_limit(request: Request, call_next):
     request_id = request.headers.get("X-Request-ID")
-
     if not request_id:
         request_id = str(uuid.uuid4())
 
     request.state.request_id = request_id
 
     client = request.headers.get("X-Client-Id", "anonymous")
-
     now = time.time()
 
     history = clients.get(client, [])
-
     history = [t for t in history if now - t < WINDOW]
 
     if len(history) >= RATE_LIMIT:
-        return JSONResponse(status_code=429, content={"detail": "Rate limit exceeded"})
+        response = JSONResponse(
+            status_code=429, content={"detail": "Rate limit exceeded"}
+        )
+        response.headers["X-Request-ID"] = request_id
+        return response
 
     history.append(now)
-
     clients[client] = history
 
     response = await call_next(request)
-
     response.headers["X-Request-ID"] = request_id
-
     return response
 
 
 @app.get("/ping")
 def ping(request: Request):
-
     return {"email": EMAIL, "request_id": request.state.request_id}
 
 

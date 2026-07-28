@@ -1,4 +1,5 @@
 """AI Pipe Responses API client with Chat Completions fallback."""
+
 import httpx
 
 from settings import Settings
@@ -29,17 +30,29 @@ class AIpipeClient:
             response = await self._client.post(f"{self.base_url}/responses", headers=self._headers, json=payload)
             response.raise_for_status()
             body = response.json()
+            print("AI PIPE RESPONSE =", body)
             if body.get("output_text"):
                 return str(body["output_text"])
             for item in body.get("output", []):
                 for content in item.get("content", []):
                     if content.get("text"):
                         return str(content["text"])
-        except (httpx.HTTPError, ValueError):
-            pass
-        fallback = {"model": self._settings.model, "messages": [{"role": "system", "content": instruction}, {"role": "user", "content": f"{context}\n{question}"}]}
+        # except (httpx.HTTPError, ValueError):
+        #     pass
+        except Exception as exc:
+            print("Responses API failed:", exc)
+            raise
+        fallback = {
+            "model": self._settings.model,
+            "messages": [
+                {"role": "system", "content": instruction},
+                {"role": "user", "content": f"{context}\n{question}"},
+            ],
+        }
         try:
-            response = await self._client.post(f"{self.base_url}/chat/completions", headers=self._headers, json=fallback)
+            response = await self._client.post(
+                f"{self.base_url}/chat/completions", headers=self._headers, json=fallback
+            )
             response.raise_for_status()
             return str(response.json()["choices"][0]["message"]["content"])
         except (httpx.HTTPError, KeyError, IndexError, ValueError) as exc:

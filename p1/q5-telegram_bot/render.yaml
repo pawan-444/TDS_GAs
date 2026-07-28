@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: telegram-data-agent
+    runtime: docker
+    healthCheckPath: /health
+    envVars:
+      - key: AI_PIPE_TOKEN
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: PUBLIC_URL
+        sync: false
+      - key: MODEL
+        value: openai/gpt-4.1-nano
+      - key: LOG_DIRECTORY
+        value: logs

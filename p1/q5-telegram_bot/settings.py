@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     ai_pipe_token: SecretStr
     telegram_bot_token: SecretStr
     public_url: HttpUrl
-    model: str = "openai/gpt-4.1-nano"
+    model: str = "openai/gpt-5-nano"
     log_directory: Path = Field(default=Path("logs"))
     host: str = "0.0.0.0"
     port: int = Field(default=8000, ge=1, le=65535)

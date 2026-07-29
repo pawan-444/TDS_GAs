@@ -10,7 +10,8 @@ class LLMError(RuntimeError):
 
 
 class AIpipeClient:
-    base_url = "https://aipipe.org/openrouter/v1"
+    base_url = "https://aipipe.org/openai/v1"
+    model = "gpt-5-nano"
 
     def __init__(self, settings: Settings, client: httpx.AsyncClient) -> None:
         self._settings = settings
@@ -35,7 +36,7 @@ class AIpipeClient:
         # Try Responses API first
         # ----------------------------
         responses_payload = {
-            "model": self._settings.model,
+            "model": self.model,
             "input": f"{instruction}\n\nContext:\n{context}\n\nQuestion:\n{question}",
         }
 
@@ -79,7 +80,7 @@ class AIpipeClient:
         # Chat Completions fallback
         # ----------------------------
         fallback_payload = {
-            "model": self._settings.model,
+            "model": self.model,
             "messages": [
                 {
                     "role": "system",

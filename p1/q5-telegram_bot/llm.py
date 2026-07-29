@@ -28,6 +28,8 @@ class AIpipeClient:
         payload = {"model": self._settings.model, "input": f"{instruction}\nContext: {context}\nQuestion: {question}"}
         try:
             response = await self._client.post(f"{self.base_url}/responses", headers=self._headers, json=payload)
+            print("STATUS:", response.status_code)
+            print("BODY:", response.text)
             response.raise_for_status()
             body = response.json()
             print("AI PIPE RESPONSE =", body)
@@ -53,6 +55,8 @@ class AIpipeClient:
             response = await self._client.post(
                 f"{self.base_url}/chat/completions", headers=self._headers, json=fallback
             )
+            print("FALLBACK STATUS:", response.status_code)
+            print("FALLBACK BODY:", response.text)
             response.raise_for_status()
             return str(response.json()["choices"][0]["message"]["content"])
         except (httpx.HTTPError, KeyError, IndexError, ValueError) as exc:

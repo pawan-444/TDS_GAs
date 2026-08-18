@@ -1,6 +1,8 @@
 import re
+
 from fastapi import FastAPI
 from pydantic import BaseModel
+
 
 app = FastAPI()
 
@@ -22,11 +24,13 @@ def release_gate(req: ReleaseGateRequest):
     workflow = req.workflow
     image = req.image
 
-    if workflow.get("permissions") != {
+    expected_permissions = {
         "contents": "read",
         "packages": "write",
         "id-token": "none",
-    }:
+    }
+
+    if workflow.get("permissions") != expected_permissions:
         violations.append("EXCESS_PERMISSION")
 
     if req.event == "pull_request" and workflow.get("trigger") != "pull_request":
@@ -41,7 +45,7 @@ def release_gate(req: ReleaseGateRequest):
 
     for action in workflow.get("actions", []):
         if action.get("owner") != "actions":
-            if not SHA40.fullmatch(action.get("ref", "")):
+            if SHA40.fullmatch(action.get("ref", "")) is None:
                 violations.append("MUTABLE_ACTION")
                 break
 
@@ -51,7 +55,7 @@ def release_gate(req: ReleaseGateRequest):
     if image.get("runsAsRoot") is not False:
         violations.append("ROOT_RUNTIME")
 
-    if image.get("secretMode") in ("arg", "copy"):
+    if image.get("secretMode") in {"arg", "copy"}:
         violations.append("SECRET_IN_LAYER")
 
     if image.get("criticalVulnerabilities") != 0:

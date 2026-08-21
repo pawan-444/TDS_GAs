@@ -19,7 +19,7 @@ class AIpipeClient:
     @property
     def _headers(self) -> dict[str, str]:
         return {
-            "Authorization": f"Bearer {self._settings.ai_pipe_token.get_secret_value()}",
+            "Authorization": (f"Bearer {self._settings.ai_pipe_token.get_secret_value()}"),
             "Content-Type": "application/json",
         }
 
@@ -31,10 +31,13 @@ class AIpipeClient:
             "Do not include markdown or explanations."
         )
 
-        # ---------- Try Responses API ----------
+        prompt = f"{instruction}\n\nContext:\n{context}\n\nQuestion:\n{question}"
+
+        # 1. Responses API
+
         responses_payload = {
             "model": self._settings.model,
-            "input": (f"{instruction}\n\nContext:\n{context}\n\nQuestion:\n{question}"),
+            "input": prompt,
         }
 
         try:
@@ -43,35 +46,51 @@ class AIpipeClient:
                 headers=self._headers,
                 json=responses_payload,
             )
+
             response.raise_for_status()
 
             body = response.json()
 
-            # New Responses API format
-            if body.get("output_text"):
-                return str(body["output_text"])
+            # Common Responses API shortcut
+            output_text = body.get("output_text")
+            if isinstance(output_text, str) and output_text.strip():
+                return output_text.strip()
 
-            # Standard Responses API format
+            # Responses API output structure
             for item in body.get("output", []):
                 for content in item.get("content", []):
-                    if content.get("type") != "output_text":
-                        continue
-
                     text = content.get("text")
 
-                    if isinstance(text, str):
-                        return text
+                    if isinstance(text, str) and text.strip():
+                        return text.strip()
 
                     if isinstance(text, dict):
                         value = text.get("value")
-                        if value:
-                            return str(value)
 
-        except httpx.HTTPError:
-            # Fall back to Chat Completions
-            pass
+                        if isinstance(value, str) and value.strip():
+                            return value.strip()
 
-        # ---------- Chat Completions Fallback ----------
+            # Request succeeded but response contained no usable text.
+            raise LLMError(f"AI Pipe Responses API returned no usable text. Response: {body}")
+
+        except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code
+            detail = exc.response.text[:1000]
+
+            # Continue to Chat Completions, but preserve the reason
+            responses_error = f"Responses API HTTP {status}: {detail}"
+
+        except httpx.RequestError as exc:
+            responses_error = f"Responses API request error: {exc}"
+
+        except ValueError as exc:
+            responses_error = f"Responses API returned invalid JSON: {exc}"
+
+        except LLMError as exc:
+            responses_error = str(exc)
+
+        # 2. Chat Completions fallback
+
         fallback_payload = {
             "model": self._settings.model,
             "messages": [
@@ -92,11 +111,41 @@ class AIpipeClient:
                 headers=self._headers,
                 json=fallback_payload,
             )
+
             response.raise_for_status()
 
             body = response.json()
 
-            return str(body["choices"][0]["message"]["content"])
+            choices = body.get("choices")
 
-        except (httpx.HTTPError, KeyError, IndexError, ValueError) as exc:
-            raise LLMError("AI Pipe did not return a valid response.") from exc
+            if not isinstance(choices, list) or not choices:
+                raise LLMError(f"AI Pipe Chat Completions returned no choices. Response: {body}")
+
+            message = choices[0].get("message", {})
+            content = message.get("content")
+
+            if isinstance(content, str) and content.strip():
+                return content.strip()
+
+            raise LLMError(f"AI Pipe Chat Completions returned no usable content. Response: {body}")
+
+        except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code
+            detail = exc.response.text[:1000]
+
+            raise LLMError(
+                f"AI Pipe Chat Completions HTTP {status}: {detail}. Responses API error: {responses_error}"
+            ) from exc
+
+        except httpx.RequestError as exc:
+            raise LLMError(
+                f"AI Pipe Chat Completions request error: {exc}. Responses API error: {responses_error}"
+            ) from exc
+
+        except ValueError as exc:
+            raise LLMError(
+                f"AI Pipe Chat Completions returned invalid JSON: {exc}. Responses API error: {responses_error}"
+            ) from exc
+
+        except LLMError as exc:
+            raise LLMError(f"{exc}. Responses API error: {responses_error}") from exc

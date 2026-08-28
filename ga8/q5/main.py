@@ -536,8 +536,8 @@ def select_phase_response(
         if stored_candidate["status"] != "frozen":
             reasons.add("NOT_FROZEN")
 
-        # Apply prediction floors only if predictions are valid.
-        if predictions_valid:
+        # Apply prediction floors only when the policy itself is valid.
+        if predictions_valid and policy_valid:
             if aggregate < policy["aggregateFloor"]:
                 reasons.add("AGGREGATE_FLOOR")
 
